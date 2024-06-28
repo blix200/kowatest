@@ -18,17 +18,12 @@ local guiVisible = true
 local teamCheck = false
 local prefix = "/aimbot"
 local infiniteAmmoEnabled = false
-local silentAimEnabled = false
-
-local validGameIDs = {286090429, 621129760}
-
-if not table.find(validGameIDs, game.PlaceId) then
-    return -- Exit script if not in a valid game
-end
+local killAllEnabled = false
+local noRecoilEnabled = false
 
 -- Function to create the GUI
 local window = Rayfield:CreateWindow({
-    Name = "Kowa Testing",
+    Name = "Aimbot Settings",
     LoadingTitle = "Loading Aimbot",
     LoadingSubtitle = "by YourName",
     ConfigurationSaving = {
@@ -37,8 +32,8 @@ local window = Rayfield:CreateWindow({
        FileName = "AimbotSettings"
     },
     Discord = {
-       Enabled = false,
-       Invite = "YwVrpsv8",
+       Enabled = true,
+       Invite = "4KEgT9fyuq",
        RememberJoins = true
     },
     KeySystem = false,
@@ -48,6 +43,7 @@ local window = Rayfield:CreateWindow({
 local mainTab = window:CreateTab("Main", 4483362458) -- Create a new tab with a specified icon
 local settingsTab = window:CreateTab("Settings", 4483362458)
 local miscTab = window:CreateTab("Misc", 4483362458)
+local rageTab = window:CreateTab("Rage", 4483362458)
 
 mainTab:CreateToggle({
     Name = "Enable Aimbot",
@@ -146,46 +142,35 @@ miscTab:CreateToggle({
 })
 
 miscTab:CreateToggle({
-    Name = "Silent Aim",
+    Name = "No Recoil",
     CurrentValue = false,
-    Flag = "SilentAimToggle",
+    Flag = "NoRecoilToggle",
     Callback = function(value)
-        silentAimEnabled = value
-        if silentAimEnabled then
-            local function getplrsname()
-                for i, v in pairs(game:GetChildren()) do
-                    if v.ClassName == "Players" then
-                        return v.Name
+        noRecoilEnabled = value
+        if noRecoilEnabled then
+            local replicationstorage = game.ReplicatedStorage
+            while noRecoilEnabled and wait(5) do
+                for _, v in pairs(replicationstorage.Weapons:GetDescendants()) do
+                    if v.Name == "RecoilControl" then
+                        v.Value = 0
+                    end
+                    if v.Name == "MaxSpread" then
+                        v.Value = 0
                     end
                 end
             end
-            local players = getplrsname()
-            local plr = game[players].LocalPlayer
-            coroutine.resume(coroutine.create(function()
-                while silentAimEnabled and wait(1) do
-                    coroutine.resume(coroutine.create(function()
-                        for _, v in pairs(game[players]:GetPlayers()) do
-                            if v.Name ~= plr.Name and v.Character then
-                                v.Character.RightUpperLeg.CanCollide = false
-                                v.Character.RightUpperLeg.Transparency = 10
-                                v.Character.RightUpperLeg.Size = Vector3.new(13, 13, 13)
+        end
+    end,
+})
 
-                                v.Character.LeftUpperLeg.CanCollide = false
-                                v.Character.LeftUpperLeg.Transparency = 10
-                                v.Character.LeftUpperLeg.Size = Vector3.new(13, 13, 13)
-
-                                v.Character.HeadHB.CanCollide = false
-                                v.Character.HeadHB.Transparency = 10
-                                v.Character.HeadHB.Size = Vector3.new(13, 13, 13)
-
-                                v.Character.HumanoidRootPart.CanCollide = false
-                                v.Character.HumanoidRootPart.Transparency = 10
-                                v.Character.HumanoidRootPart.Size = Vector3.new(13, 13, 13)
-                            end
-                        end
-                    end))
-                end
-            end))
+rageTab:CreateToggle({
+    Name = "Kill All",
+    CurrentValue = false,
+    Flag = "KillAllToggle",
+    Callback = function(value)
+        killAllEnabled = value
+        if killAllEnabled then
+            killAll()
         end
     end,
 })
@@ -230,9 +215,7 @@ function enableESP()
         if player ~= localPlayer and player.Character then
             createESPBox(player.Character)
             player.CharacterAdded:Connect(function(character)
-                if espEnabled then
-                    createESPBox(character)
-                end
+                createESPBox(character)
             end)
         end
     end
@@ -240,9 +223,7 @@ function enableESP()
     players.PlayerAdded:Connect(function(player)
         player.CharacterAdded:Connect(function(character)
             if player ~= localPlayer then
-                if espEnabled then
-                    createESPBox(character)
-                end
+                createESPBox(character)
             end
         end)
     end)
@@ -273,6 +254,12 @@ function createESPBox(character)
     espBox.Color3 = Color3.new(1, 0, 0)
     espBox.Transparency = 0.5
     espBox.Parent = character
+
+    character:WaitForChild("Humanoid").Died:Connect(function()
+        if espEnabled then
+            createESPBox(character)
+        end
+    end)
 end
 
 -- Expand hitboxes
@@ -382,4 +369,28 @@ for _, player in pairs(players:GetPlayers()) do
             createESPBox(character)
         end
     end)
+end
+
+-- Kill All function
+function killAll()
+    coroutine.wrap(function()
+        while killAllEnabled do
+            for _, player in pairs(players:GetPlayers()) do
+                if not killAllEnabled then break end
+                if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    if teamCheck and player.Team == localPlayer.Team then continue end
+                    local hrp = player.Character.HumanoidRootPart
+                    local originalCFrame = localPlayer.Character.HumanoidRootPart.CFrame
+                    localPlayer.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 0, 2)
+                    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        humanoid.Died:Wait()
+                    end
+                    localPlayer.Character.HumanoidRootPart.CFrame = originalCFrame
+                    wait(0.1)
+                end
+            end
+            wait(0.1)
+        end
+    end)()
 end
