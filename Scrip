@@ -38,7 +38,7 @@ local window = Rayfield:CreateWindow({
     },
     Discord = {
        Enabled = false,
-       Invite = "sirius",
+       Invite = "YwVrpsv8",
        RememberJoins = true
     },
     KeySystem = false,
