@@ -1,0 +1,385 @@
+-- Load the RAYFIELD UI Library
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+local camera = workspace.CurrentCamera
+local userInputService = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local guiService = game:GetService("UserInputService")
+
+local holdingRightMouseButton = false
+local currentTarget = nil
+local aimbotEnabled = false
+local espEnabled = false
+local infiniteJumpEnabled = false
+local bhopEnabled = false
+local guiVisible = true
+local teamCheck = false
+local prefix = "/aimbot"
+local infiniteAmmoEnabled = false
+local silentAimEnabled = false
+
+local validGameIDs = {286090429, 621129760}
+
+if not table.find(validGameIDs, game.PlaceId) then
+    return -- Exit script if not in a valid game
+end
+
+-- Function to create the GUI
+local window = Rayfield:CreateWindow({
+    Name = "Kowa Testing",
+    LoadingTitle = "Loading Aimbot",
+    LoadingSubtitle = "by YourName",
+    ConfigurationSaving = {
+       Enabled = true,
+       FolderName = nil,
+       FileName = "AimbotSettings"
+    },
+    Discord = {
+       Enabled = false,
+       Invite = "sirius",
+       RememberJoins = true
+    },
+    KeySystem = false,
+    Key = "ABCDEF"
+})
+
+local mainTab = window:CreateTab("Main", 4483362458) -- Create a new tab with a specified icon
+local settingsTab = window:CreateTab("Settings", 4483362458)
+local miscTab = window:CreateTab("Misc", 4483362458)
+
+mainTab:CreateToggle({
+    Name = "Enable Aimbot",
+    CurrentValue = false,
+    Flag = "AimbotToggle",
+    Callback = function(value)
+        aimbotEnabled = value
+    end,
+})
+
+mainTab:CreateToggle({
+    Name = "Enable ESP",
+    CurrentValue = false,
+    Flag = "ESPToggle",
+    Callback = function(value)
+        espEnabled = value
+        if espEnabled then
+            enableESP()
+        else
+            disableESP()
+        end
+    end,
+})
+
+settingsTab:CreateInput({
+    Name = "Prefix",
+    PlaceholderText = "/aimbot",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(value)
+        prefix = value
+    end,
+})
+
+settingsTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = false,
+    Flag = "TeamCheckToggle",
+    Callback = function(value)
+        teamCheck = value
+    end,
+})
+
+miscTab:CreateToggle({
+    Name = "Hitbox Expander",
+    CurrentValue = false,
+    Flag = "HitboxToggle",
+    Callback = function(value)
+        expandHitboxes(value)
+    end,
+})
+
+miscTab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 100},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "SpeedSlider",
+    Callback = function(value)
+        localPlayer.Character.Humanoid.WalkSpeed = value
+    end,
+})
+
+miscTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfiniteJumpToggle",
+    Callback = function(value)
+        infiniteJumpEnabled = value
+    end,
+})
+
+miscTab:CreateToggle({
+    Name = "BHOP",
+    CurrentValue = false,
+    Flag = "BHOPToggle",
+    Callback = function(value)
+        bhopEnabled = value
+    end,
+})
+
+miscTab:CreateToggle({
+    Name = "Infinite Ammo",
+    CurrentValue = false,
+    Flag = "InfiniteAmmoToggle",
+    Callback = function(value)
+        infiniteAmmoEnabled = value
+        if infiniteAmmoEnabled then
+            local replicationStorage = game.ReplicatedStorage
+            while infiniteAmmoEnabled and wait() do
+                localPlayer.PlayerGui.GUI.Client.Variables.ammocount.Value = 999
+                localPlayer.PlayerGui.GUI.Client.Variables.ammocount2.Value = 999
+            end
+        end
+    end,
+})
+
+miscTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Flag = "SilentAimToggle",
+    Callback = function(value)
+        silentAimEnabled = value
+        if silentAimEnabled then
+            local function getplrsname()
+                for i, v in pairs(game:GetChildren()) do
+                    if v.ClassName == "Players" then
+                        return v.Name
+                    end
+                end
+            end
+            local players = getplrsname()
+            local plr = game[players].LocalPlayer
+            coroutine.resume(coroutine.create(function()
+                while silentAimEnabled and wait(1) do
+                    coroutine.resume(coroutine.create(function()
+                        for _, v in pairs(game[players]:GetPlayers()) do
+                            if v.Name ~= plr.Name and v.Character then
+                                v.Character.RightUpperLeg.CanCollide = false
+                                v.Character.RightUpperLeg.Transparency = 10
+                                v.Character.RightUpperLeg.Size = Vector3.new(13, 13, 13)
+
+                                v.Character.LeftUpperLeg.CanCollide = false
+                                v.Character.LeftUpperLeg.Transparency = 10
+                                v.Character.LeftUpperLeg.Size = Vector3.new(13, 13, 13)
+
+                                v.Character.HeadHB.CanCollide = false
+                                v.Character.HeadHB.Transparency = 10
+                                v.Character.HeadHB.Size = Vector3.new(13, 13, 13)
+
+                                v.Character.HumanoidRootPart.CanCollide = false
+                                v.Character.HumanoidRootPart.Transparency = 10
+                                v.Character.HumanoidRootPart.Size = Vector3.new(13, 13, 13)
+                            end
+                        end
+                    end))
+                end
+            end))
+        end
+    end,
+})
+
+-- Function to get the closest player
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            if teamCheck and player.Team == localPlayer.Team then
+                continue
+            end
+
+            local head = player.Character.Head
+            local headPosition = head.Position
+            local cameraPosition = camera.CFrame.Position
+
+            local direction = (headPosition - cameraPosition).unit
+            local ray = Ray.new(cameraPosition, direction * (headPosition - cameraPosition).magnitude)
+            local hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, {localPlayer.Character})
+
+            if hit and hit:IsDescendantOf(player.Character) then
+                local screenPoint = camera:WorldToScreenPoint(headPosition)
+                local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - userInputService:GetMouseLocation()).magnitude
+
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+-- Enable ESP
+function enableESP()
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            createESPBox(player.Character)
+            player.CharacterAdded:Connect(function(character)
+                if espEnabled then
+                    createESPBox(character)
+                end
+            end)
+        end
+    end
+
+    players.PlayerAdded:Connect(function(player)
+        player.CharacterAdded:Connect(function(character)
+            if player ~= localPlayer then
+                if espEnabled then
+                    createESPBox(character)
+                end
+            end
+        end)
+    end)
+end
+
+-- Disable ESP
+function disableESP()
+    for _, player in pairs(players:GetPlayers()) do
+        if player.Character then
+            for _, v in pairs(player.Character:GetChildren()) do
+                if v:IsA("BoxHandleAdornment") or v:IsA("SelectionBox") then
+                    v:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- Create ESP Box
+function createESPBox(character)
+    if teamCheck and players:GetPlayerFromCharacter(character).Team == localPlayer.Team then return end
+
+    local espBox = Instance.new("BoxHandleAdornment")
+    espBox.Adornee = character
+    espBox.AlwaysOnTop = true
+    espBox.ZIndex = 10
+    espBox.Size = character:GetExtentsSize()
+    espBox.Color3 = Color3.new(1, 0, 0)
+    espBox.Transparency = 0.5
+    espBox.Parent = character
+end
+
+-- Expand hitboxes
+function expandHitboxes(expand)
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            for _, part in pairs(player.Character:GetChildren()) do
+                if part:IsA("BasePart") and not part:FindFirstChild("Hitbox") then
+                    if teamCheck and player.Team == localPlayer.Team then continue end
+                    local hitbox = Instance.new("Part")
+                    hitbox.Name = "Hitbox"
+                    hitbox.Size = expand and Vector3.new(10, 10, 10) or part.Size
+                    hitbox.Transparency = 1
+                    hitbox.CanCollide = false
+                    hitbox.Anchored = false
+                    hitbox.CFrame = part.CFrame
+                    hitbox.Parent = part
+
+                    local weld = Instance.new("WeldConstraint")
+                    weld.Part0 = part
+                    weld.Part1 = hitbox
+                    weld.Parent = part
+                elseif part:FindFirstChild("Hitbox") then
+                    local hitbox = part.Hitbox
+                    hitbox.Size = expand and Vector3.new(10, 10, 10) or part.Size
+                end
+            end
+        end
+    end
+end
+
+-- Infinite Jump
+userInputService.JumpRequest:Connect(function()
+    if infiniteJumpEnabled then
+        localPlayer.Character:FindFirstChildOfClass('Humanoid'):ChangeState("Jumping")
+    end
+end)
+
+-- BHOP
+runService.RenderStepped:Connect(function()
+    if bhopEnabled and localPlayer.Character:FindFirstChildOfClass('Humanoid').FloorMaterial ~= Enum.Material.Air then
+        localPlayer.Character:FindFirstChildOfClass('Humanoid'):ChangeState("Jumping")
+    end
+end)
+
+userInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then -- Right mouse button
+        holdingRightMouseButton = true
+    elseif input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Period then -- Close GUI prefix
+        guiVisible = not guiVisible
+        window:Toggle(guiVisible)
+    end
+end)
+
+userInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then -- Right mouse button
+        holdingRightMouseButton = false
+        currentTarget = nil -- Reset target when right mouse button is released
+    end
+end)
+
+runService.RenderStepped:Connect(function()
+    if aimbotEnabled and holdingRightMouseButton then
+        if currentTarget == nil or not currentTarget.Character or not currentTarget.Character:FindFirstChild("Head") then
+            currentTarget = getClosestPlayer()
+        end
+
+        if currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("Head") then
+            local head = currentTarget.Character.Head
+            local headPosition = head.Position
+            local cameraPosition = camera.CFrame.Position
+
+            local direction = (headPosition - cameraPosition).unit
+            local newCameraCFrame = CFrame.new(cameraPosition, cameraPosition + direction)
+            camera.CFrame = newCameraCFrame
+        end
+    end
+end)
+
+guiService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local typedText = input.KeyCode.Name
+        if typedText == prefix then
+            aimbotEnabled = not aimbotEnabled
+        end
+    end
+end)
+
+-- Hook into player's respawn to ensure ESP stays on
+players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        if espEnabled then
+            createESPBox(character)
+        end
+    end)
+end)
+
+for _, player in pairs(players:GetPlayers()) do
+    player.CharacterAdded:Connect(function(character)
+        if espEnabled then
+            createESPBox(character)
+        end
+    end)
+end
